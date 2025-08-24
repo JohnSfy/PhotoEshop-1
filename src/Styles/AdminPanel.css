@@ -1,0 +1,14 @@
+.admin{max-width:1200px;margin:0 auto}
+.pageTitle{font-size:30px;font-weight:800}
+.pageSubtitle{color:var(--muted);margin-top:6px}
+.tabs{display:flex;gap:24px;border-bottom:1px solid var(--border);margin-bottom:24px}
+.tabs__btn{padding:10px 4px;border:none;background:none;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer}
+.tabs__btn--active{color:var(--primary);border-bottom-color:var(--primary)}
+.progress{width:100%;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+.progress__bar{height:100%;background:var(--primary);transition:width .3s}
+.galleryGrid{display:grid;gap:24px;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1024px){.galleryGrid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:640px){.galleryGrid{grid-template-columns:1fr}}
+.photoCard__img{aspect-ratio:1/1;object-fit:cover;width:100%}
+.priceBadge{position:absolute;top:8px;right:8px}
+.kpi{text-align:center;padding:24px}
