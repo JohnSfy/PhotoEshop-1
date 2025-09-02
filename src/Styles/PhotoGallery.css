@@ -1,3 +1,4 @@
+/* --- Gallery base (υπήρχον) --- */
 .gallery{display:flex;flex-direction:column;gap:24px}
 .gallery__top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
 .gallery__title{font-weight:800;font-size:30px}
@@ -11,3 +12,92 @@
 .photoCard__overlay{position:absolute;inset:0;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;opacity:0;transition:.2s}
 .photoCard:hover .photoCard__overlay{background:rgba(0,0,0,.3);opacity:1}
 .photoCard__price{position:absolute;top:12px;right:12px}
+
+/* --- ΝΕΟ: Δίστηλο layout (gallery | sidebar) --- */
+.galleryLayout{
+  display:grid;
+  grid-template-columns:1fr 260px;
+  gap:24px;
+  align-items:start;
+}
+
+/* --- ΝΕΟ: Sidebar “Συλλογές” --- */
+.collectionsSidebar{
+  position:sticky;
+  top:16px;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.collectionsSidebar__header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:8px;
+}
+.collectionsSidebar__list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.collectionsSidebar__item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  width:100%;
+  text-align:left;
+  padding:10px 12px;
+  border-radius:12px;
+  background:var(--surface,#fff);
+  border:1px solid var(--border,#e5e7eb);
+  transition:background .15s ease,border-color .15s ease,transform .02s ease;
+}
+.collectionsSidebar__item:hover{
+  background:var(--surface-2,#f9fafb);
+  border-color:var(--border-strong,#d1d5db);
+}
+.collectionsSidebar__item.active{
+  border-color:var(--primary,#2563eb);
+  box-shadow:0 0 0 2px rgba(37,99,235,.08);
+}
+
+/* --- ΝΕΟ: Utility classes που χρησιμοποιούνται από το JSX --- */
+.badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:24px;
+  height:24px;
+  padding:0 8px;
+  font-weight:700;
+  font-size:12px;
+  border-radius:999px;
+  background:var(--surface-2,#f3f4f6);
+  color:var(--text,#111827);
+}
+.badge--primary{
+  background:var(--primary,#2563eb);
+  color:#fff;
+}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px}
+.p-4{padding:16px}
+.mb-1{margin-bottom:4px}
+.mb-2{margin-bottom:8px}
+.rounded{border-radius:8px}
+.bg-current{background:currentColor}
+.muted{color:var(--muted,#6b7280)}
+
+/* --- ΝΕΟ: Grid helper (4 στήλες στο desktop) --- */
+.grid{display:grid;gap:16px}
+.grid--4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1200px){.grid--4{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:900px){.grid--4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.grid--4{grid-template-columns:1fr}}
+
+/* --- Responsive: Sidebar κάτω από το gallery στα μικρά --- */
+@media (max-width:1024px){
+  .galleryLayout{grid-template-columns:1fr}
+  .collectionsSidebar{position:static}
+}

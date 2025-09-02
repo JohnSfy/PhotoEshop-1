@@ -1,4 +1,4 @@
-.admin{max-width:1200px;margin:0 auto}
+/* .admin{max-width:1200px;margin:0 auto}
 .pageTitle{font-size:30px;font-weight:800}
 .pageSubtitle{color:var(--muted);margin-top:6px}
 .tabs{display:flex;gap:24px;border-bottom:1px solid var(--border);margin-bottom:24px}
@@ -11,4 +11,54 @@
 @media (max-width:640px){.galleryGrid{grid-template-columns:1fr}}
 .photoCard__img{aspect-ratio:1/1;object-fit:cover;width:100%}
 .priceBadge{position:absolute;top:8px;right:8px}
-.kpi{text-align:center;padding:24px}
+.kpi{text-align:center;padding:24px} */
+
+.grid.grid--3 {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+/* Σταθερό media container με αναλογία & crop για να μην βλέπεις μαύρες μπάρες */
+.mediaBox {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;            /* διάλεξε: 1/1, 4/5, 3/4 κλπ */
+  background: #fff;               /* φόντο λευκό */
+  overflow: hidden;
+  border-bottom: 1px solid var(--line, #e5e7eb);
+}
+
+.mediaBox img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;              /* γεμίζει, κόβει τα κενά/μαύρα */
+  display: block;
+}
+
+/* Αν θέλεις *όλη* την εικόνα χωρίς κόψιμο, άλλαξε το cover -> contain
+   και πρόσθεσε λίγο ματ */
+.mediaBox--contain img { object-fit: contain; background: #fff; }
+
+/* Badge τιμής */
+.mediaBox__price {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* Checkbox επιλογής */
+.mediaBox__check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 18px;
+  height: 18px;
+}
+
+/* Τίτλος & σώμα πιο “σφιχτά” */
+.card .p-4 { padding: 12px !important; }
+.text-ellipsis { 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+}

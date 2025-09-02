@@ -62,11 +62,19 @@ const Checkout = () => {
       setOrderStatus("completed");
       clearCart();
       setIframeVisible(false);
+
+      // Alert και redirect
+      alert("✅ Η πληρωμή ολοκληρώθηκε επιτυχώς!");
+      navigate("/", { replace: true }); // redirect στο homepage
     } else if (q.get("failed") === "1") {
       setOrderStatus("failed");
       setIframeVisible(false);
+
+      // Προαιρετικό alert για αποτυχία
+      alert("❌ Η πληρωμή απέτυχε. Δοκίμασε ξανά.");
     }
   }, [search, clearCart]);
+
 
   // Φόρτωσε δυναμικά το myPOS Embedded SDK
   useEffect(() => {
@@ -81,6 +89,12 @@ const Checkout = () => {
     s.onerror = () => setPaymentError("Failed to load myPOS SDK");
     document.body.appendChild(s);
   }, []);
+
+  useEffect(() => {
+    if (orderStatus === "completed") {
+      navigate("/"); // redirect αμέσως στο homepage
+    }
+  }, [orderStatus, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -128,8 +142,13 @@ const Checkout = () => {
         isSandbox: MY_POS_SANDBOX,
         // Προαιρετικά: θα κληθούν ΜΟΝΟ όσο είσαι ακόμα μέσα στη σελίδα.
         onSuccess: () => {
-          // Το πραγματικό τελικό state το χειριζόμαστε από το redirect.
+          // Κλείσε το iframe, καθάρισε καλάθι, ενημέρωσε UI και κάνε redirect
           setIframeVisible(false);
+          clearCart();
+          alert("✅ Η πληρωμή ολοκληρώθηκε επιτυχώς!");
+          navigate("/", { replace: true });
+          // αν θες, setOrderStatus("completed") για να πυροδοτήσεις και το δικό σου state
+          setOrderStatus("completed");
         },
         onError: () => {
           // Αν δεν γίνει redirect, δείξε failed
@@ -159,20 +178,20 @@ const Checkout = () => {
     }
   };
 
-  if (orderStatus === "completed") {
-    return (
-      <div className="checkout text-center p-6" style={{ maxWidth: 720, margin: "0 auto" }}>
-        <CheckCircle style={{ width: 64, height: 64, color: "var(--green)" }} />
-        <h1 className="checkoutTitle mt-3">Payment Successful! 🎉</h1>
-        <p className="muted mb-4" style={{ fontSize: 16 }}>
-          Thank you for your purchase! Your clean photos have been sent to your email.
-        </p>
-        <button onClick={() => navigate("/")} className="btn btn--primary" style={{ marginTop: 16 }}>
-          Return to Gallery
-        </button>
-      </div>
-    );
-  }
+  // if (orderStatus === "completed") {
+  //   return (
+  //     <div className="checkout text-center p-6" style={{ maxWidth: 720, margin: "0 auto" }}>
+  //       <CheckCircle style={{ width: 64, height: 64, color: "var(--green)" }} />
+  //       <h1 className="checkoutTitle mt-3">Payment Successful! 🎉</h1>
+  //       <p className="muted mb-4" style={{ fontSize: 16 }}>
+  //         Thank you for your purchase! Your clean photos have been sent to your email.
+  //       </p>
+  //       <button onClick={() => navigate("/")} className="btn btn--primary" style={{ marginTop: 16 }}>
+  //         Return to Gallery
+  //       </button>
+  //     </div>
+  //   );
+  // }
 
   if (orderStatus === "failed") {
     return (
