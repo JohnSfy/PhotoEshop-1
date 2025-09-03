@@ -7,5 +7,8 @@ export default defineConfig({
   server: {
     host: true, // This will expose the server on your network
     port: 5173
+  },
+  build: {
+    outDir: 'build' // Change output directory to 'build' for Render deployment
   }
 })
