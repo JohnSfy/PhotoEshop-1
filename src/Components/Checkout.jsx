@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "../../Context/CartContext";
+import { useLanguage } from "../../Context/LanguageContext";
 import "../Styles/Checkout.css";
 import { ArrowLeft, CheckCircle, AlertCircle, Clock } from "lucide-react";
 
@@ -31,6 +32,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { search } = useLocation();
   const { cartItems, cartTotal, clearCart } = useCart();
+  const { t } = useLanguage();
 
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -86,7 +88,7 @@ const Checkout = () => {
     s.src = "https://developers.mypos.com/repository/mypos-embedded-sdk.js";
     s.async = true;
     s.onload = () => setMyposReady(true);
-    s.onerror = () => setPaymentError("Failed to load myPOS SDK");
+    s.onerror = () => setPaymentError(t('failedToLoadMyPOS'));
     document.body.appendChild(s);
   }, []);
 
@@ -101,11 +103,11 @@ const Checkout = () => {
     setPaymentError("");
 
     if (!customerName || !customerEmail) {
-      setPaymentError("Please fill in all required fields");
+      setPaymentError(t('pleaseFillRequiredFields'));
       return;
     }
     if (!myposReady) {
-      setPaymentError("myPOS is still loading…");
+      setPaymentError(t('myPOSStillLoading'));
       return;
     }
 
@@ -118,7 +120,7 @@ const Checkout = () => {
 
       // Μετατροπή cart σε cartItems του myPOS
       const cartLines = cartItems.map((it) => ({
-        article: it.filename || it.title || "Photo",
+        article: it.filename || it.title || t('photo'),
         quantity: it.quantity || 1,
         price: Number(it.price),
         currency: "EUR",
@@ -153,7 +155,7 @@ const Checkout = () => {
         onError: () => {
           // Αν δεν γίνει redirect, δείξε failed
           setOrderStatus("failed");
-          setPaymentError("Payment failed. Please try again.");
+          setPaymentError(t('paymentError'));
         },
       };
 
@@ -172,7 +174,7 @@ const Checkout = () => {
       );
 
     } catch (err) {
-      setPaymentError(err?.message || "Checkout failed. Please try again.");
+      setPaymentError(err?.message || t('checkoutFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -220,34 +222,45 @@ const Checkout = () => {
     <div className="checkout">
       {/* Header */}
       <div className="checkoutHeader">
-        <button onClick={() => navigate("/cart")} className="btn btn--secondary" aria-label="Back to cart">
-          <ArrowLeft style={{ width: 18, height: 18 }} />
+        <button onClick={() => navigate("/cart")} className="btn btn--secondary" aria-label={t('backToCart')}>
+          <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="checkoutTitle">Checkout</h1>
-          <p className="muted mt-1">Pay safely with myPOS Embedded Checkout</p>
+          <h1 className="checkoutTitle">{t('checkout')}</h1>
+          <p className="checkoutSubtitle">{t('paySafelyWithMyPOS')}</p>
         </div>
       </div>
 
       <div className="grid grid--2">
         {/* Form */}
         <div className="grid-col">
-          <div className="card p-4 mb-4">
-            <h2 className="mb-3" style={{ fontWeight: 700, fontSize: 18 }}>Customer Information</h2>
+          <div className="checkout__form">
+            <h2>{t('customerInformation')}</h2>
             <form onSubmit={handleSubmit} className="summaryList">
-              <div>
-                <label className="mb-1" style={{ display: "block", fontWeight: 600 }}>Full Name *</label>
-                <input className="input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
+              <div className="form__group">
+                <label className="form__label">{t('fullName')} *</label>
+                <input 
+                  className="form__input" 
+                  value={customerName} 
+                  onChange={(e) => setCustomerName(e.target.value)} 
+                  required 
+                />
               </div>
-              <div>
-                <label className="mb-1" style={{ display: "block", fontWeight: 600 }}>Email Address *</label>
-                <input type="email" className="input" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} required />
-                <p className="muted mt-1" style={{ fontSize: 12 }}>We’ll send your photos here.</p>
+              <div className="form__group">
+                <label className="form__label">{t('emailAddress')} *</label>
+                <input 
+                  type="email" 
+                  className="form__input" 
+                  value={customerEmail} 
+                  onChange={(e) => setCustomerEmail(e.target.value)} 
+                  required 
+                />
+                <p className="form__help">{t('weWillSendPhotosHere')}</p>
               </div>
 
               {paymentError && (
-                <div className="notice notice--red" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <AlertCircle style={{ width: 18, height: 18 }} />
+                <div className="notice notice--red" style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                  <AlertCircle size={18} />
                   <span>{paymentError}</span>
                 </div>
               )}
@@ -256,9 +269,9 @@ const Checkout = () => {
                 type="submit"
                 disabled={isProcessing || !myposReady}
                 className="btn btn--primary"
-                style={{ width: "100%", padding: "12px 16px", fontSize: 16, opacity: isProcessing ? 0.7 : 1 }}
+                style={{ width: "100%", padding: "var(--space-md) var(--space-lg)", fontSize: "1rem", opacity: isProcessing ? 0.7 : 1 }}
               >
-                Proceed to Payment - €{cartTotal.toFixed(2)}
+                {t('proceedToPayment')} - €{cartTotal.toFixed(2)}
               </button>
             </form>
           </div>
@@ -266,12 +279,12 @@ const Checkout = () => {
           {/* Status */}
           {orderId && iframeVisible && (
             <div className="notice notice--yellow">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Clock style={{ width: 18, height: 18 }} />
-                <div style={{ fontSize: 14 }}>
-                  <p style={{ fontWeight: 600, marginBottom: 4 }}>Order Created</p>
-                  <p>Order ID: {orderId}</p>
-                  <p>Loading payment form…</p>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                <Clock size={18} />
+                <div style={{ fontSize: "0.875rem" }}>
+                  <p style={{ fontWeight: 600, marginBottom: 4 }}>{t('orderCreated')}</p>
+                  <p>{t('orderId')}: {orderId}</p>
+                  <p>{t('loadingPaymentForm')}…</p>
                 </div>
               </div>
             </div>
@@ -280,32 +293,41 @@ const Checkout = () => {
 
         {/* Order summary + Payment container */}
         <div className="grid-col">
-          <div className="card p-4 mb-4">
-            <h3 className="mb-3" style={{ fontWeight: 700 }}>Order Summary</h3>
-            <div className="summaryList mb-3">
-              <div className="summaryRow"><span>Photos ({cartItems.length})</span><span>€{cartTotal.toFixed(2)}</span></div>
-              <div className="summaryRow"><span>Fees</span><span>Free</span></div>
-              <div className="summaryTotal"><span>Total</span><span style={{ color: "var(--primary)" }}>€{cartTotal.toFixed(2)}</span></div>
+          <div className="checkout__summary">
+            <h3>{t('orderSummary')}</h3>
+            <div className="summaryList">
+              <div className="summaryRow">
+                <span>{t('photos')} ({cartItems.length})</span>
+                <span>€{cartTotal.toFixed(2)}</span>
+              </div>
+              <div className="summaryRow">
+                <span>{t('fees')}</span>
+                <span>{t('free')}</span>
+              </div>
+              <div className="summaryTotal">
+                <span>{t('total')}</span>
+                <span style={{ color: "var(--primary)" }}>€{cartTotal.toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
-          <div className="card p-4">
-            <h4 className="mb-3" style={{ fontWeight: 600 }}>Payment</h4>
+          <div className="checkout__form">
+            <h4 style={{ fontWeight: 600, marginBottom: "var(--space-lg)" }}>{t('payment')}</h4>
             <div
               id="myPOSEmbeddedCheckout"
               ref={containerRef}
+              className="payment__container"
               style={{
-                minHeight: 420,
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                overflow: "hidden",
                 display: iframeVisible ? "block" : "none",
               }}
             />
             {!iframeVisible && (
-              <p className="muted" style={{ fontSize: 14 }}>
-                Click “Proceed to Payment” to load the myPOS secure card form here.
-              </p>
+              <div className="payment__container">
+                <div className="payment__loading">
+                  <Clock className="payment__loading-icon" />
+                  <p>{t('clickProceedToPayment')}</p>
+                </div>
+              </div>
             )}
           </div>
         </div>

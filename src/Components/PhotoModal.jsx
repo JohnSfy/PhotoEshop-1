@@ -1,14 +1,17 @@
 import React from "react";
 import { X, ShoppingCart, Heart, Download, Calendar, DollarSign } from "lucide-react";
+import { useLanguage } from "../../Context/LanguageContext";
 import "../Styles/PhotoModal.css"; // adjust the path if needed
 
 const PhotoModal = ({ photo, onClose, onAddToCart, isInCart }) => {
+  const { t } = useLanguage();
+  
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) onClose();
   };
 
   const src = photo.watermarkedUrl || photo.url;
-  const name = photo.filename || photo.title || "Photo";
+  const name = photo.filename || photo.title || t('photo');
   const uploaded =
     photo.uploadedAt ? new Date(photo.uploadedAt).toLocaleDateString() : "";
 
@@ -17,9 +20,9 @@ const PhotoModal = ({ photo, onClose, onAddToCart, isInCart }) => {
       <div className="modal__dialog">
         {/* Header */}
         <div className="modal__header">
-          <h2 className="text-ellipsis">{name}</h2>
-          <button onClick={onClose} className="btn btn--secondary" aria-label="Close">
-            <X style={{ width: 18, height: 18 }} />
+          <h2>{name}</h2>
+          <button onClick={onClose} className="modal__close" aria-label={t('close')}>
+            <X size={20} />
           </button>
         </div>
 
@@ -29,99 +32,88 @@ const PhotoModal = ({ photo, onClose, onAddToCart, isInCart }) => {
           <div className="modal__image">
             <div style={{ position: "relative" }}>
               <img src={src} alt={name} />
-              <div className="badge badge--yellow watermark">Watermarked Preview</div>
+              <div className="watermark">{t('watermarkedPreview')}</div>
             </div>
           </div>
 
           {/* Aside / Details */}
           <aside className="modal__aside">
             {/* Photo info */}
-            <section>
-              <h3>Photo Details</h3>
+            <div className="modal__section">
+              <h3>{t('photoDetails')}</h3>
               <div className="infoRow">
-                <Calendar style={{ width: 16, height: 16 }} />
-                <span>Uploaded: {uploaded}</span>
+                <Calendar size={16} />
+                <span>{t('uploaded')}: {uploaded}</span>
               </div>
-              <div className="infoRow" style={{ alignItems: "center" }}>
-                <DollarSign style={{ width: 16, height: 16 }} />
-                <span style={{ fontWeight: 700, color: "var(--primary)" }}>
-                  ${photo.price}
+              <div className="infoRow">
+                <DollarSign size={16} />
+                <span style={{ fontWeight: 700, color: "var(--primary)", fontSize: "1.125rem" }}>
+                  €{photo.price}
                 </span>
               </div>
-            </section>
+            </div>
 
             {/* What you get */}
-            <section>
-              <h4>What You'll Get</h4>
-              <ul style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 14 }}>
+            <div className="modal__section">
+              <h4>{t('whatYoullGet')}</h4>
+              <ul className="modal__features">
                 {[
-                  "High-resolution clean version",
-                  "No watermarks or logos",
-                  "Professional quality",
-                  "Instant email delivery",
+                  t('highResolutionClean'),
+                  t('noWatermarks'),
+                  t('professionalQuality'),
+                  t('instantEmailDelivery'),
                 ].map((item, i) => (
-                  <li key={i} className="infoRow">
-                    <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        background: "var(--green)",
-                        borderRadius: "50%",
-                      }}
-                    />
-                    <span>{item}</span>
-                  </li>
+                  <li key={i}>{item}</li>
                 ))}
               </ul>
-            </section>
+            </div>
 
             {/* Actions */}
-            <section>
-              {isInCart ? (
-                <div
-                  className="notice"
-                  style={{
-                    background: "var(--green-50)",
-                    borderColor: "#a7f3d0",
-                    color: "#047857",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                  }}
-                >
-                  <Heart style={{ width: 18, height: 18 }} />
-                  <span className="font-medium">Added to Cart</span>
-                </div>
-              ) : (
-                <button onClick={onAddToCart} className="btn btn--primary" style={{ width: "100%" }}>
-                  <ShoppingCart style={{ width: 18, height: 18 }} />
-                  <span>Add to Cart</span>
-                </button>
-              )}
+            <div className="modal__section">
+              <div className="modal__actions">
+                {isInCart ? (
+                  <div
+                    className="btn btn--success"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "var(--space-sm)",
+                      width: "100%",
+                    }}
+                  >
+                    <Heart size={18} />
+                    <span>{t('addedToCart')}</span>
+                  </div>
+                ) : (
+                  <button onClick={onAddToCart} className="btn btn--primary" style={{ width: "100%" }}>
+                    <ShoppingCart size={18} />
+                    <span>{t('addToCart')}</span>
+                  </button>
+                )}
 
-              <button
-                onClick={() => {
-                  const link = document.createElement("a");
-                  link.href = src;
-                  link.download = name;
-                  link.click();
-                }}
-                className="btn btn--secondary"
-                style={{ width: "100%" }}
-              >
-                <Download style={{ width: 18, height: 18 }} />
-                <span>Download Preview</span>
-              </button>
-            </section>
+                <button
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = src;
+                    link.download = name;
+                    link.click();
+                  }}
+                  className="btn btn--secondary"
+                  style={{ width: "100%" }}
+                >
+                  <Download size={18} />
+                  <span>{t('downloadPreview')}</span>
+                </button>
+              </div>
+            </div>
 
             {/* Note */}
-            <section className="notice" style={{ fontSize: 12 }}>
+            <div className="modal__note">
               <p>
-                <strong>Note:</strong> This is a watermarked preview. Purchase to
-                receive the clean, high-resolution version via email.
+                <strong>{t('note')}:</strong> {t('watermarkedPreviewNote')}
               </p>
-            </section>
+            </div>
           </aside>
         </div>
       </div>

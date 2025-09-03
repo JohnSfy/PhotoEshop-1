@@ -2,34 +2,115 @@ import React, { useMemo, useState } from "react";
 import { Heart, ShoppingCart, Eye, Filter } from "lucide-react";
 import { usePhotos } from "../../Context/PhotoContext";
 import { useCart } from "../../Context/CartContext";
+import { useLanguage } from "../../Context/LanguageContext";
 import PhotoModal from "./PhotoModal";
 import "../Styles/PhotoGallery.css";
 
 const PhotoGallery = () => {
-  const { wmPhotos, categories, loading, error } = usePhotos();
+  const { wmPhotos, categories, loading, error, fetchPhotos } = usePhotos();
   const { addToCart, isInCart } = useCart();
+  const { t } = useLanguage();
 
   const [selectedPhoto, setSelectedPhoto] = useState(null);
-  const [viewMode, setViewMode] = useState("grid");   // grid | list
-  const [category, setCategory] = useState("");       // "" = όλες
-  const [timeFilter, setTimeFilter] = useState("all"); // all | recent
+  const [viewMode, setViewMode] = useState("grid");
+  const [category, setCategory] = useState("");
+  const [timeFilter, setTimeFilter] = useState("all");
 
-  // Συλλογές με counters (από τα wmPhotos)
+  // Sample photos for testing
+  const samplePhotos = [
+    {
+      id: 'sample1',
+      url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=600&fit=crop',
+      filename: 'Mountain Landscape',
+      category: 'Nature',
+      price: 15.99,
+      uploadedAt: new Date().toISOString()
+    },
+    {
+      id: 'sample2', 
+      url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&h=500&fit=crop',
+      filename: 'Forest Path',
+      category: 'Nature',
+      price: 12.99,
+      uploadedAt: new Date().toISOString()
+    },
+    {
+      id: 'sample3',
+      url: 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400&h=700&fit=crop',
+      filename: 'Ocean Waves',
+      category: 'Nature',
+      price: 18.99,
+      uploadedAt: new Date().toISOString()
+    },
+    {
+      id: 'sample4',
+      url: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=550&fit=crop',
+      filename: 'Forest Canopy',
+      category: 'Nature',
+      price: 14.99,
+      uploadedAt: new Date().toISOString()
+    },
+    {
+      id: 'sample5',
+      url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=600&fit=crop',
+      filename: 'Mountain Peak',
+      category: 'Landscape',
+      price: 16.99,
+      uploadedAt: new Date().toISOString()
+    },
+    {
+      id: 'sample6',
+      url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&h=500&fit=crop',
+      filename: 'Sunset Beach',
+      category: 'Landscape',
+      price: 19.99,
+      uploadedAt: new Date().toISOString()
+    },
+    {
+      id: 'sample7',
+      url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=600&fit=crop',
+      filename: 'Mountain Vista',
+      category: 'Adventure',
+      price: 22.99,
+      uploadedAt: new Date().toISOString()
+    },
+    {
+      id: 'sample8',
+      url: 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400&h=700&fit=crop',
+      filename: 'Ocean Sunset',
+      category: 'Adventure',
+      price: 24.99,
+      uploadedAt: new Date().toISOString()
+    }
+  ];
+
+  // Always use real photos from API, never fallback to samples
+  const displayPhotos = wmPhotos || [];
+
+  // Debug logging
+  console.log("🔍 PhotoGallery Debug:");
+  console.log("wmPhotos:", wmPhotos);
+  console.log("wmPhotos length:", wmPhotos?.length);
+  console.log("loading:", loading);
+  console.log("error:", error);
+  console.log("displayPhotos length:", displayPhotos?.length);
+
+  // Collections with counters
   const collections = useMemo(() => {
     const map = new Map();
-    (wmPhotos || []).forEach((p) => {
+    (displayPhotos || []).forEach((p) => {
       const c = (p.category || "").trim();
       map.set(c, (map.get(c) || 0) + 1);
     });
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([name, count]) => ({ name, count }));
-  }, [wmPhotos]);
+  }, [displayPhotos]);
 
-  // Φιλτραρισμένα ορατά
+  // Filtered visible photos
   const visible = useMemo(() => {
-    if (!Array.isArray(wmPhotos)) return [];
-    let out = wmPhotos;
+    if (!Array.isArray(displayPhotos)) return [];
+    let out = displayPhotos;
 
     if (category) out = out.filter((p) => (p.category || "") === category);
 
@@ -39,31 +120,31 @@ const PhotoGallery = () => {
       out = out.filter((p) => new Date(p.uploadedAt || Date.now()) > weekAgo);
     }
     return out;
-  }, [wmPhotos, category, timeFilter]);
+  }, [displayPhotos, category, timeFilter]);
 
-  if (loading) return <div className="text-center p-4">Loading…</div>;
+  if (loading) return <div className="text-center p-4">{t('loading')}…</div>;
 
   if (error) {
     return (
       <div className="text-center p-4">
         <div className="mb-3" style={{ color: "#991b1b" }}>{String(error)}</div>
         <button onClick={() => window.location.reload()} className="btn btn--primary">
-          Try Again
+          {t('tryAgain')}
         </button>
       </div>
     );
   }
 
-  const totalCount = (wmPhotos || []).length;
+  const totalCount = (displayPhotos || []).length;
 
-  // Empty state με sidebar
+  // Empty state
   if (!visible || visible.length === 0) {
     return (
       <div className="galleryLayout">
         <div className="gallery">
           <div className="text-center p-4">
-            <div className="mb-2 muted">No photos available yet</div>
-            <p className="muted">Check back later for new event photos!</p>
+            <div className="mb-2 muted">{t('noPhotosAvailable')}</div>
+            <p className="muted">{t('checkBackLater')}</p>
           </div>
         </div>
         <CollectionsSidebar
@@ -71,156 +152,193 @@ const PhotoGallery = () => {
           activeCategory={category}
           onSelectCategory={setCategory}
           totalCount={totalCount}
+          t={t}
         />
       </div>
     );
   }
 
   return (
-    <div className="galleryLayout">
-      {/* Αριστερή στήλη: Gallery */}
-      <div className="gallery">
-        {/* Header & controls */}
-        <div className="gallery__top">
-          <div>
-            <h1 className="gallery__title">Event Photo Gallery</h1>
-            <p className="gallery__desc">
-              Browse and select your favorite photos. Add them to cart to purchase clean versions.
-            </p>
-          </div>
-
-          <div className="gallery__filters">
-            {/* Category select (συγχρονισμένο με το sidebar) */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Filter style={{ width: 18, height: 18, color: "#6b7280" }} />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="select"
-                aria-label="Category"
-              >
-                <option value="">All categories</option>
-                {categories?.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Time filter */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Filter style={{ width: 18, height: 18, color: "#6b7280" }} />
-              <select
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value)}
-                className="select"
-                aria-label="Time filter"
-              >
-                <option value="all">All Photos</option>
-                <option value="recent">Recent (7 days)</option>
-              </select>
-            </div>
-
-            {/* View mode */}
-            <div className="viewSwitch" role="tablist" aria-label="View mode">
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`viewBtn ${viewMode === "grid" ? "viewBtn--active" : ""}`}
-                aria-pressed={viewMode === "grid"}
-                aria-label="Grid view"
-              >
-                <div style={{ width: 16, height: 16, display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 2 }}>
-                  <div className="bg-current rounded"></div>
-                  <div className="bg-current rounded"></div>
-                  <div className="bg-current rounded"></div>
-                  <div className="bg-current rounded"></div>
-                </div>
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`viewBtn ${viewMode === "list" ? "viewBtn--active" : ""}`}
-                aria-pressed={viewMode === "list"}
-                aria-label="List view"
-              >
-                <div style={{ width: 16, height: 16, display: "flex", flexDirection: "column", gap: 2 }}>
-                  <div className="bg-current rounded" style={{ height: 4 }}></div>
-                  <div className="bg-current rounded" style={{ height: 4 }}></div>
-                  <div className="bg-current rounded" style={{ height: 4 }}></div>
-                </div>
-              </button>
-            </div>
+    <div className="gallery">
+      {/* Hero Section */}
+      <div className="gallery__hero">
+        <div className="gallery__hero-content">
+          <h1 className="gallery__title">{t('premiumEventPhotos')}</h1>
+          <p className="gallery__desc">
+            {t('galleryDescription')}
+          </p>
+          
+          {/* Debug Panel */}
+          <div style={{ 
+            background: 'rgba(0,0,0,0.1)', 
+            padding: '10px', 
+            borderRadius: '8px', 
+            marginTop: '20px',
+            fontSize: '14px',
+            fontFamily: 'monospace'
+          }}>
+            <strong>🔍 Debug Info:</strong><br/>
+            Photos loaded: {wmPhotos?.length || 0}<br/>
+            Loading: {loading ? 'Yes' : 'No'}<br/>
+            Error: {error || 'None'}<br/>
+            Display photos: {displayPhotos?.length || 0}
           </div>
         </div>
-
-        {/* Περιεχόμενο: Grid/List */}
-        {viewMode === "grid" ? (
-          <div className="grid grid--4">
-            {visible.map((photo) => (
-              <PhotoCard
-                key={photo.id || photo.url}
-                photo={photo}
-                viewMode="grid"
-                onView={() => setSelectedPhoto(photo)}
-                onAddToCart={() => addToCart(photo)}
-                isInCart={isInCart(photo.id || photo.url)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {visible.map((photo) => (
-              <PhotoCard
-                key={photo.id || photo.url}
-                photo={photo}
-                viewMode="list"
-                onView={() => setSelectedPhoto(photo)}
-                onAddToCart={() => addToCart(photo)}
-                isInCart={isInCart(photo.id || photo.url)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Modal */}
-        {selectedPhoto && (
-          <PhotoModal
-            photo={selectedPhoto}
-            onClose={() => setSelectedPhoto(null)}
-            onAddToCart={() => {
-              addToCart(selectedPhoto);
-              setSelectedPhoto(null);
-            }}
-            isInCart={isInCart(selectedPhoto.id || selectedPhoto.url)}
-          />
-        )}
       </div>
 
-      {/* Δεξιά στήλη: Sidebar Συλλογές */}
-      <CollectionsSidebar
-        collections={collections}
-        activeCategory={category}
-        onSelectCategory={setCategory}
-        totalCount={totalCount}
-      />
+      <div className="galleryLayout">
+        {/* Main Gallery */}
+        <div className="gallery__main">
+          {/* Filters */}
+          <div className="gallery__top">
+            <div className="gallery__filters">
+              <div className="gallery__filter-group">
+                <Filter size={18} />
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="select"
+                  aria-label={t('category')}
+                >
+                  <option value="">{t('allCategories')}</option>
+                  {categories?.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <button 
+                onClick={async () => {
+                  console.log("🔄 Manual refresh triggered");
+                  try {
+                    await fetchPhotos();
+                    console.log("✅ Photos refreshed successfully");
+                  } catch (err) {
+                    console.error("❌ Refresh failed:", err);
+                  }
+                }}
+                className="btn btn--secondary"
+                style={{ marginLeft: "var(--space-md)" }}
+              >
+                🔄 Refresh
+              </button>
+
+              <div className="gallery__filter-group">
+                <Filter size={18} />
+                <select
+                  value={timeFilter}
+                  onChange={(e) => setTimeFilter(e.target.value)}
+                  className="select"
+                  aria-label={t('timeFilter')}
+                >
+                  <option value="all">{t('allPhotos')}</option>
+                  <option value="recent">{t('recent')}</option>
+                </select>
+              </div>
+
+              <div className="viewSwitch" role="tablist" aria-label={t('viewMode')}>
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`viewBtn ${viewMode === "grid" ? "viewBtn--active" : ""}`}
+                  aria-pressed={viewMode === "grid"}
+                  aria-label={t('gridView')}
+                >
+                  <div style={{ width: 16, height: 16, display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 2 }}>
+                    <div style={{ background: "currentColor", borderRadius: "2px" }}></div>
+                    <div style={{ background: "currentColor", borderRadius: "2px" }}></div>
+                    <div style={{ background: "currentColor", borderRadius: "2px" }}></div>
+                    <div style={{ background: "currentColor", borderRadius: "2px" }}></div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`viewBtn ${viewMode === "list" ? "viewBtn--active" : ""}`}
+                  aria-pressed={viewMode === "list"}
+                  aria-label={t('listView')}
+                >
+                  <div style={{ width: 16, height: 16, display: "flex", flexDirection: "column", gap: 2 }}>
+                    <div style={{ background: "currentColor", borderRadius: "2px", height: "3px" }}></div>
+                    <div style={{ background: "currentColor", borderRadius: "2px", height: "3px" }}></div>
+                    <div style={{ background: "currentColor", borderRadius: "2px", height: "3px" }}></div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Photo Grid */}
+          {viewMode === "grid" ? (
+            <div className="gallery__grid">
+              {visible.map((photo) => (
+                <PhotoCard
+                  key={photo.id || photo.url}
+                  photo={photo}
+                  viewMode="grid"
+                  onView={() => setSelectedPhoto(photo)}
+                  onAddToCart={() => addToCart(photo)}
+                  isInCart={isInCart(photo.id || photo.url)}
+                  t={t}
+                />
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
+              {visible.map((photo) => (
+                <PhotoCard
+                  key={photo.id || photo.url}
+                  photo={photo}
+                  viewMode="list"
+                  onView={() => setSelectedPhoto(photo)}
+                  onAddToCart={() => addToCart(photo)}
+                  isInCart={isInCart(photo.id || photo.url)}
+                  t={t}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Modal */}
+          {selectedPhoto && (
+            <PhotoModal
+              photo={selectedPhoto}
+              onClose={() => setSelectedPhoto(null)}
+              onAddToCart={() => {
+                addToCart(selectedPhoto);
+                setSelectedPhoto(null);
+              }}
+              isInCart={isInCart(selectedPhoto.id || selectedPhoto.url)}
+            />
+          )}
+        </div>
+
+        {/* Collections Sidebar */}
+        <CollectionsSidebar
+          collections={collections}
+          activeCategory={category}
+          onSelectCategory={setCategory}
+          totalCount={totalCount}
+          t={t}
+        />
+      </div>
     </div>
   );
 };
 
-const CollectionsSidebar = ({ collections, activeCategory, onSelectCategory, totalCount }) => {
+const CollectionsSidebar = ({ collections, activeCategory, onSelectCategory, totalCount, t }) => {
   return (
-    <aside className="collectionsSidebar card" aria-label="Collections sidebar">
+    <aside className="collectionsSidebar" aria-label={t('collectionsSidebar')}>
       <div className="collectionsSidebar__header">
-        <h3 style={{ fontWeight: 800 }}>Συλλογές</h3>
-        <span className="badge">{totalCount}</span>
+        <h3 className="collectionsSidebar__title">{t('collections')}</h3>
+        <span className="collectionsSidebar__badge">{totalCount}</span>
       </div>
 
       <button
         className={`collectionsSidebar__item ${activeCategory === "" ? "active" : ""}`}
         onClick={() => onSelectCategory("")}
-        title="Όλες οι φωτογραφίες"
+        title={t('allPhotosCollection')}
         aria-current={activeCategory === "" ? "true" : "false"}
       >
-        <span>Όλες</span>
-        <span className="muted">{totalCount}</span>
+        <span className="collectionsSidebar__item-name">{t('allPhotosCollection')}</span>
+        <span className="collectionsSidebar__item-count">{totalCount}</span>
       </button>
 
       <div className="collectionsSidebar__list">
@@ -229,11 +347,11 @@ const CollectionsSidebar = ({ collections, activeCategory, onSelectCategory, tot
             key={name || "(none)"}
             className={`collectionsSidebar__item ${activeCategory === name ? "active" : ""}`}
             onClick={() => onSelectCategory(name)}
-            title={name || "Χωρίς κατηγορία"}
+            title={name || t('uncategorized')}
             aria-current={activeCategory === name ? "true" : "false"}
           >
-            <span>{name || "Χωρίς κατηγορία"}</span>
-            <span className="muted">{count}</span>
+            <span className="collectionsSidebar__item-name">{name || t('uncategorized')}</span>
+            <span className="collectionsSidebar__item-count">{count}</span>
           </button>
         ))}
       </div>
@@ -241,46 +359,45 @@ const CollectionsSidebar = ({ collections, activeCategory, onSelectCategory, tot
   );
 };
 
-const PhotoCard = ({ photo, viewMode, onView, onAddToCart, isInCart }) => {
+const PhotoCard = ({ photo, viewMode, onView, onAddToCart, isInCart, t }) => {
   const src =
     photo.url ||
     photo.watermarkedUrl ||
     photo.watermarkedPath ||
     photo.path;
 
-  const name = photo.filename || photo.title || photo.category || "Photo";
+  const name = photo.filename || photo.title || photo.category || t('photo');
   const uploaded = photo.uploadedAt ? new Date(photo.uploadedAt).toLocaleDateString() : "";
   const price = typeof photo.price === "number" ? photo.price : (photo.price ?? 0);
 
   if (viewMode === "list") {
     return (
-      <div className="card p-4" style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div className="card" style={{ display: "flex", alignItems: "center", gap: "var(--space-lg)", padding: "var(--space-lg)" }}>
         <img
           src={src}
           alt={name}
-          className="rounded"
+          className="rounded-xl"
           style={{ width: 96, height: 96, objectFit: "cover" }}
           loading="lazy"
         />
         <div style={{ flex: 1 }}>
-          <h3 className="mb-1">{name}</h3>
+          <h3 className="photoCard__title">{name}</h3>
           <p className="muted">{uploaded}</p>
           <p style={{ fontWeight: 700, color: "var(--primary)", marginTop: 6 }}>
             {price ? `€${price}` : ""}
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={onView} className="btn btn--secondary" title="View full size">
-            <Eye style={{ width: 18, height: 18 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+          <button onClick={onView} className="btn btn--secondary" title={t('viewFullSize')}>
+            <Eye size={18} />
           </button>
           <button
             onClick={onAddToCart}
             disabled={isInCart}
-            className="btn btn--primary"
-            title={isInCart ? "Already in cart" : "Add to cart"}
-            style={isInCart ? { opacity: 0.7, cursor: "not-allowed", background: "var(--green)" } : undefined}
+            className={`btn ${isInCart ? "btn--success" : "btn--primary"}`}
+            title={isInCart ? t('alreadyInCart') : t('addToCart')}
           >
-            {isInCart ? <Heart style={{ width: 18, height: 18 }} /> : <ShoppingCart style={{ width: 18, height: 18 }} />}
+            {isInCart ? <Heart size={18} /> : <ShoppingCart size={18} />}
           </button>
         </div>
       </div>
@@ -289,33 +406,37 @@ const PhotoCard = ({ photo, viewMode, onView, onAddToCart, isInCart }) => {
 
   // Grid card
   return (
-    <div className="photoCard card">
-      <div style={{ position: "relative" }}>
+    <div className="photoCard">
+      <div className="photoCard__image-container">
         <img src={src} alt={name} className="photoCard__img" loading="lazy" />
 
         <div className="photoCard__overlay" aria-hidden="true">
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onView} className="btn btn--secondary" title="View full size">
-              <Eye style={{ width: 18, height: 18 }} />
+          <div className="photoCard__actions">
+            <button onClick={onView} className="photoCard__action-btn" title={t('viewFullSize')}>
+              <Eye size={18} />
             </button>
             <button
               onClick={onAddToCart}
               disabled={isInCart}
-              className="btn btn--primary"
-              title={isInCart ? "Already in cart" : "Add to cart"}
-              style={isInCart ? { opacity: 0.7, cursor: "not-allowed", background: "var(--green)" } : undefined}
+              className={`photoCard__action-btn ${isInCart ? "btn--success" : ""}`}
+              title={isInCart ? t('alreadyInCart') : t('addToCart')}
             >
-              {isInCart ? <Heart style={{ width: 18, height: 18 }} /> : <ShoppingCart style={{ width: 18, height: 18 }} />}
+              {isInCart ? <Heart size={18} /> : <ShoppingCart size={18} />}
             </button>
           </div>
         </div>
 
-        {price ? <div className="badge badge--primary photoCard__price">€{price}</div> : null}
+        {price ? <div className="photoCard__price">€{price}</div> : null}
       </div>
 
-      <div className="p-4">
-        <h3 className="mb-1">{name}</h3>
-        <p className="muted">{uploaded}</p>
+      <div className="photoCard__content">
+        <h3 className="photoCard__title">{name}</h3>
+        <div className="photoCard__meta">
+          <span>{uploaded}</span>
+          {photo.category && (
+            <span className="photoCard__category">{photo.category}</span>
+          )}
+        </div>
       </div>
     </div>
   );

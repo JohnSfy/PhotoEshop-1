@@ -1,20 +1,29 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Upload, Image, Package, Users, DollarSign, Trash2, Eye, Plus, Tag, Save } from "lucide-react";
 import { usePhotos } from "../../Context/PhotoContext";
+import { useLanguage } from "../../Context/LanguageContext";
 import "../Styles/AdminPanel.css";
 
 const AdminPanel = () => {
-  const {
-    photos,
-    categories,
-    fetchPhotos,
-    fetchCategories,
-    uploadPhotos,
-    updatePhoto,
-    deletePhotos,
-    createCategory,
-    removeCategory,
-  } = usePhotos();
+  console.log("🏗️ AdminPanel component rendering...");
+  
+  try {
+    const {
+      photos,
+      categories,
+      fetchPhotos,
+      fetchCategories,
+      uploadPhotos,
+      updatePhoto,
+      deletePhotos,
+      createCategory,
+      removeCategory,
+      loading,
+      error,
+    } = usePhotos();
+    const { t } = useLanguage();
+    
+    console.log("✅ AdminPanel hooks loaded successfully");
 
   const [activeTab, setActiveTab] = useState("upload");
   const [isUploading, setIsUploading] = useState(false);
@@ -60,15 +69,35 @@ const AdminPanel = () => {
   };
   const clearSelection = () => setSelectedIds(new Set());
 
+  const selectAll = () => {
+    const allIds = new Set(visible.map(p => p.id));
+    setSelectedIds(allIds);
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const isAllSelected = visible.length > 0 && selectedIds.size === visible.length;
+  const isSomeSelected = selectedIds.size > 0;
+
   // -------- MULTIPLE Upload Handler (μόνη επιλογή) --------
   const handleMultiUpload = async (e) => {
     e.preventDefault();
     const files = multiFilesRef.current?.files;
-    if (!files || files.length === 0) return setUploadError("Please choose at least one photo");
-    if (!multiCategory) return setUploadError("Please select a category");
+    if (!files || files.length === 0) return setUploadError(t('pleaseChooseAtLeastOnePhoto'));
+    if (!multiCategory) return setUploadError(t('pleaseSelectCategory'));
 
     const priceNum = parsePrice(multiPrice);
-    if (priceNum == null || priceNum < 0) return setUploadError("Please enter a valid price (>= 0)");
+    if (priceNum == null || priceNum < 0) return setUploadError(t('pleaseEnterValidPrice'));
+
+    // Additional validation
+    if (!multiCategory || multiCategory.trim() === "") {
+      return setUploadError(t('pleaseSelectCategory'));
+    }
+    if (!multiPrice || multiPrice.trim() === "") {
+      return setUploadError(t('pleaseEnterPrice'));
+    }
 
     try {
       fakeProgress(setUploadProgress, setIsUploading);
@@ -76,26 +105,40 @@ const AdminPanel = () => {
       const cats = Array.from(files).map(() => multiCategory);
       const prices = Array.from(files).map(() => String(priceNum));
 
-      // Χτίζουμε FormData όπως στο test page
-      const fd = new FormData();
-      Array.from(files).forEach(() => {
-        // για κάθε φωτογραφία θα μπουν ΤΡΙΑ entries:
-        // 1) photos (το ίδιο αρχείο), 2) prices (η ίδια τιμή), 3) categories (η ίδια κατηγορία)
-      });
-      Array.from(files).forEach((file) => fd.append("photos", file));
-      Array.from(files).forEach(() => fd.append("prices", String(priceNum)));
-      Array.from(files).forEach(() => fd.append("categories", multiCategory));
+      // Debug logging
+      console.log("🔍 Upload Debug Info:");
+      console.log("Selected Category:", multiCategory);
+      console.log("Selected Price:", priceNum);
+      console.log("Raw Price Input:", multiPrice);
+      console.log("Categories Array:", cats);
+      console.log("Prices Array:", prices);
+      console.log("Files Count:", files.length);
+      
+      // Validation check
+      if (!multiCategory || multiCategory.trim() === "") {
+        throw new Error("Category is empty!");
+      }
+      if (!priceNum || priceNum <= 0) {
+        throw new Error("Price is invalid!");
+      }
+      if (cats.length === 0 || prices.length === 0) {
+        throw new Error("Categories or prices array is empty!");
+      }
+      
+      console.log("✅ Validation passed - sending to server");
 
-      // προσοχή: μην βάλεις Content-Type χειροκίνητα
-      await uploadPhotos({ files, categories: cats, prices }); // το uploadPhotos πρέπει να κάνει fetch με body: fd
+      // Use the uploadPhotos function which handles FormData internally
+      await uploadPhotos({ files, categories: cats, prices });
 
       endProgress(setUploadProgress, setUploadSuccess,
-        `Uploaded ${files.length} photos to “${multiCategory}” at ${fmtEUR(priceNum)} each!`
+        `Uploaded ${files.length} photos to "${multiCategory}" at ${fmtEUR(priceNum)} each!`
       );
       multiFilesRef.current.value = "";
-      setMultiCategory("");
+      // Don't reset category immediately - let user see the selection
+      // setMultiCategory("");
       setMultiPrice("");
       fetchPhotos(); // για να δεις άμεσα price/category ενημερωμένα
+      fetchCategories(); // Refresh categories list
     } catch (err) {
       failProgress(setIsUploading, setUploadError, err);
     }
@@ -140,20 +183,93 @@ const AdminPanel = () => {
 
 
   const deleteOne = async (id) => {
-    if (!window.confirm("Delete this photo?")) return;
-    await deletePhotos([id]);
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
+    console.log("🗑️ Individual delete triggered for ID:", id);
+    
+    if (!window.confirm(t('deleteThisPhoto'))) {
+      console.log("❌ User cancelled individual deletion");
+      return;
+    }
+    
+    try {
+      console.log("🚀 Starting individual delete with ID:", id);
+      await deletePhotos([id]);
+      console.log("✅ Individual delete successful");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    } catch (error) {
+      console.error("❌ Individual delete failed:", error);
+      alert(t('deleteFailed') + ": " + (error.message || error));
+    }
   };
 
   const bulkDelete = async () => {
-    if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} selected photo(s)?`)) return;
-    await deletePhotos(Array.from(selectedIds));
-    clearSelection();
+    console.log("🗑️ Bulk delete triggered");
+    console.log("Selected IDs:", selectedIds);
+    console.log("Selected count:", selectedIds.size);
+    
+    if (selectedIds.size === 0) {
+      console.log("❌ No photos selected");
+      return;
+    }
+    
+    const confirmMessage = t('deleteSelectedPhotos').replace('{count}', selectedIds.size);
+    if (!window.confirm(confirmMessage)) {
+      console.log("❌ User cancelled deletion");
+      return;
+    }
+    
+    try {
+      console.log("🚀 Starting bulk delete with IDs:", Array.from(selectedIds));
+      await deletePhotos(Array.from(selectedIds));
+      console.log("✅ Bulk delete successful");
+      clearSelection();
+      
+      // Show success message
+      const successMessage = t('bulkDeleteSuccess').replace('{count}', selectedIds.size);
+      alert(successMessage);
+    } catch (error) {
+      console.error("❌ Bulk delete failed:", error);
+      alert(t('bulkDeleteFailed') + ": " + (error.message || error));
+    }
+  };
+
+  // Delete all photos from a specific category
+  const deleteAllPhotosFromCategory = async (categoryName) => {
+    console.log("🗑️ Delete all photos from category triggered:", categoryName);
+    
+    // Get all photos from this category
+    const photosInCategory = photos.filter(p => (p.category || "").trim() === categoryName.trim());
+    console.log("📋 Photos in category:", photosInCategory);
+    
+    if (photosInCategory.length === 0) {
+      alert(t('noPhotosInCategory').replace('{category}', categoryName));
+      return;
+    }
+    
+    const confirmMessage = t('deleteAllPhotosFromCategory').replace('{count}', photosInCategory.length).replace('{category}', categoryName);
+    if (!window.confirm(confirmMessage)) {
+      console.log("❌ User cancelled category deletion");
+      return;
+    }
+    
+    try {
+      console.log("🚀 Starting delete all photos from category:", categoryName);
+      const photoIds = photosInCategory.map(p => p.id);
+      console.log("📋 Photo IDs to delete:", photoIds);
+      
+      await deletePhotos(photoIds);
+      console.log("✅ Delete all photos from category successful");
+      
+      // Show success message
+      const successMessage = t('deleteAllPhotosFromCategorySuccess').replace('{count}', photosInCategory.length).replace('{category}', categoryName);
+      alert(successMessage);
+    } catch (error) {
+      console.error("❌ Delete all photos from category failed:", error);
+      alert(t('deleteAllPhotosFromCategoryFailed') + ": " + (error.message || error));
+    }
   };
 
   // -------- Orders (mock demo) --------
@@ -162,7 +278,7 @@ const AdminPanel = () => {
       {
         id: "1",
         customerEmail: "john@example.com",
-        customerName: "John Doe",
+        customerName: t('johnDoe'),
         totalAmount: 29.95,
         photoCount: 5,
         status: "completed",
@@ -187,18 +303,18 @@ const AdminPanel = () => {
   };
 
   const tabs = [
-    { id: "upload", label: "Upload (Multiple Only)", icon: Upload },
-    { id: "gallery", label: "Manage Gallery", icon: Image },
-    { id: "categories", label: "Categories", icon: Tag },
-    { id: "orders", label: "Orders", icon: Package },
-    { id: "analytics", label: "Analytics", icon: DollarSign },
+    { id: "upload", label: t('uploadMultipleOnly'), icon: Upload },
+    { id: "gallery", label: t('manageGallery'), icon: Image },
+    { id: "categories", label: t('categories'), icon: Tag },
+    { id: "orders", label: t('orders'), icon: Package },
+    { id: "analytics", label: t('analytics'), icon: DollarSign },
   ];
 
   return (
     <div className="admin">
       <div className="adminHeader">
         <h1 className="adminTitle">Admin Panel</h1>
-        <p className="muted">Manage your photo gallery and sales</p>
+        <p className="adminSubtitle">Manage your photo gallery and sales</p>
       </div>
 
       {/* Tabs */}
@@ -219,18 +335,18 @@ const AdminPanel = () => {
 
       {/* UPLOAD (Multiple only) */}
       {activeTab === "upload" && (
-        <div className="card p-4">
-          <h2 className="mb-3" style={{ fontWeight: 700, fontSize: 18 }}>Upload Multiple Photos</h2>
+        <div className="admin__section">
+          <h2>Upload Multiple Photos</h2>
           <form onSubmit={handleMultiUpload} className="formStack">
-            <div>
+            <div className="form__group">
               <label className="label">Photos *</label>
-              <input ref={multiFilesRef} type="file" multiple accept="image/*" className="input" required />
+              <input ref={multiFilesRef} type="file" multiple accept="image/*" className="admin__input" required />
             </div>
-            <div className="row" style={{ gap: 12 }}>
+            <div className="row">
               <div style={{ flex: 1 }}>
                 <label className="label">Category *</label>
                 <select
-                  className="input"
+                  className="admin__select"
                   value={multiCategory}
                   onChange={(e) => setMultiCategory(e.target.value)}
                   required
@@ -244,10 +360,10 @@ const AdminPanel = () => {
               <div style={{ flex: 1 }}>
                 <label className="label">Price per photo (€) *</label>
                 <input
-                  type="text"              // ήταν number
+                  type="text"
                   inputMode="decimal"
-                  className="input"
-                  placeholder="π.χ. 5 ή 5,99"
+                  className="admin__input"
+                  placeholder="e.g. 5 or 5.99"
                   value={multiPrice}
                   onChange={(e) => setMultiPrice(e.target.value)}
                   required
@@ -257,16 +373,82 @@ const AdminPanel = () => {
 
             {uploadError && <div className="notice notice--red">{uploadError}</div>}
             {uploadSuccess && <div className="notice notice--green">{uploadSuccess}</div>}
+            
+            {/* Debug Status */}
+            <div style={{ 
+              background: 'rgba(0,0,0,0.1)', 
+              padding: '10px', 
+              borderRadius: '8px', 
+              marginTop: '10px',
+              fontSize: '12px',
+              fontFamily: 'monospace'
+            }}>
+              <strong>🔍 Upload Debug:</strong><br/>
+              Photos in DB: {photos?.length || 0}<br/>
+              Categories: {categories?.length || 0}<br/>
+              Loading: {loading ? 'Yes' : 'No'}<br/>
+              Error: {error || 'None'}
+            </div>
             {isUploading && (
               <div>
                 <div className="progress"><div className="progress__bar" style={{ width: `${uploadProgress}%` }} /></div>
-                <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>Uploading… {uploadProgress}%</p>
+                <p className="muted" style={{ fontSize: "0.75rem", marginTop: "var(--space-sm)" }}>Uploading… {uploadProgress}%</p>
               </div>
             )}
 
-            <button type="submit" disabled={isUploading} className="btn btn--primary">
-              {isUploading ? "Uploading..." : "Upload"}
-            </button>
+            <div className="row" style={{ gap: "var(--space-md)" }}>
+              <button type="submit" disabled={isUploading} className="btn btn--primary">
+                {isUploading ? t('uploading') : t('upload')}
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  console.log("🧪 Form Values Test:");
+                  console.log("Category:", multiCategory);
+                  console.log("Price:", multiPrice);
+                  console.log("Parsed Price:", parsePrice(multiPrice));
+                  console.log("Category length:", multiCategory?.length);
+                  console.log("Price length:", multiPrice?.length);
+                  console.log("Category type:", typeof multiCategory);
+                  console.log("Price type:", typeof multiPrice);
+                  
+                  // Show alert with values
+                  alert(`Category: "${multiCategory}"\nPrice: "${multiPrice}"\nParsed: ${parsePrice(multiPrice)}`);
+                }}
+                className="btn btn--secondary"
+                disabled={isUploading}
+              >
+                Test Values
+              </button>
+              <button 
+                type="button" 
+                onClick={async () => {
+                  console.log("🔄 Manual photo fetch test...");
+                  try {
+                    await fetchPhotos();
+                    console.log("✅ Photo fetch completed");
+                  } catch (err) {
+                    console.error("❌ Photo fetch failed:", err);
+                  }
+                }}
+                className="btn btn--secondary"
+                disabled={isUploading}
+              >
+                Test Fetch
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setMultiCategory("");
+                  setMultiPrice("");
+                  if (multiFilesRef.current) multiFilesRef.current.value = "";
+                }}
+                className="btn btn--secondary"
+                disabled={isUploading}
+              >
+                {t('clearForm')}
+              </button>
+            </div>
           </form>
         </div>
       )}
@@ -274,118 +456,122 @@ const AdminPanel = () => {
       {/* GALLERY MANAGEMENT */}
       {activeTab === "gallery" && (
         <div className="stack-6">
-          <div className="row between">
-            <h2 className="mb-0" style={{ fontWeight: 700, fontSize: 18 }}>Photo Gallery</h2>
-            <div className="row" style={{ gap: 12 }}>
-              <select
-                className="input"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                aria-label="Filter by category"
-              >
-                <option value="">All categories</option>
-                {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
-              </select>
-              <button className="btn btn--secondary" onClick={fetchPhotos}>Refresh</button>
-              <button className="btn btn--danger" onClick={bulkDelete} disabled={selectedIds.size === 0}>
-                <Trash2 style={{ width: 16, height: 16, marginRight: 6, verticalAlign: -3 }} />
-                Delete Selected ({selectedIds.size})
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid--3">
-            {visible.map((p) => {
-              const src = p.watermarkedUrl || p.url;
-              const name = p.filename || p.title || "Photo";
-              const edit = edits[p.id] || {};
-              return (
-                <div key={p.id} className="card overflow-hidden">
-                  <div className="ratio ratio--1x1">
-                    <div className="mediaBox">
-                      <img src={src} alt={name} />
-                      <div className="badge badge--primary mediaBox__price">
-                        {fmtEUR(edit.price ?? p.price)}
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(p.id)}
-                        onChange={() => toggleSelect(p.id)}
-                        className="mediaBox__check"
-                        title="Select for bulk actions"
-                      />
-                    </div>
-                    {/* <input
-                      type="checkbox"
-                      checked={selectedIds.has(p.id)}
-                      onChange={() => toggleSelect(p.id)}
-                      style={{ position: "absolute", top: 8, left: 8, width: 18, height: 18 }}
-                      title="Select for bulk actions"
-                    /> */}
-                  </div>
-
-                  <div className="p-4">
-                    <div className="row between">
-                      <h3 className="mb-1 text-ellipsis" style={{ fontWeight: 600, maxWidth: "70%" }}>{name}</h3>
-                      <button onClick={() => window.open(src, "_blank")} className="linkBtn" type="button">
-                        <Eye style={{ width: 16, height: 16, marginRight: 6, verticalAlign: -3 }} />
-                        View
-                      </button>
-                    </div>
-
-                    <p className="muted mb-2" style={{ fontSize: 12 }}>
-                      {p.uploadedAt ? new Date(p.uploadedAt).toLocaleDateString() : ""}
-                    </p>
-
-                    <div className="row" style={{ gap: 8 }}>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        className="input"
-                        value={edit.price ?? (p.price ?? "")}
-                        onChange={(e) => setEditField(p.id, "price", e.target.value)}
-                        placeholder="5,99"
-                        style={{ flex: 1 }}
-                      />
-                      <select
-                        className="input"
-                        value={edit.category ?? p.category ?? ""}
-                        onChange={(e) => setEditField(p.id, "category", e.target.value)}
-                        style={{ flex: 1 }}
-                      >
-                        <option value="">(none)</option>
-                        {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
-                      </select>
-                    </div>
-
-                    <div className="row between" style={{ marginTop: 10 }}>
-                      <button
-                        className="btn btn--danger"
-                        onClick={() => deleteOne(p.id)}
-                        type="button"
-                      >
-                        <Trash2 style={{ width: 16, height: 16, marginRight: 6, verticalAlign: -3 }} />
-                        Delete
-                      </button>
-                      <button
-                        className="btn btn--primary"
-                        onClick={() => savePhotoEdits(p.id)}
-                        type="button"
-                      >
-                        <Save style={{ width: 16, height: 16, marginRight: 6, verticalAlign: -3 }} />
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {visible.length === 0 && (
-              <div className="muted" style={{ gridColumn: "1 / -1", textAlign: "center", padding: 24 }}>
-                No photos in this category
+          <div className="admin__section">
+            <div className="row between">
+              <h2>Photo Gallery</h2>
+              <div className="row">
+                <select
+                  className="admin__select"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  aria-label={t('filterByCategory')}
+                >
+                  <option value="">{t('allCategories')}</option>
+                  {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
+                </select>
+                <button className="btn btn--secondary" onClick={fetchPhotos}>{t('refresh')}</button>
+                {visible.length > 0 && (
+                  <button 
+                    className="btn btn--outline" 
+                    onClick={isAllSelected ? deselectAll : selectAll}
+                    title={isAllSelected ? t('deselectAll') : t('selectAll')}
+                  >
+                    {isAllSelected ? t('deselectAll') : t('selectAll')} ({visible.length})
+                  </button>
+                )}
+                <button className="btn btn--danger" onClick={bulkDelete} disabled={selectedIds.size === 0}>
+                  <Trash2 size={16} />
+                  {t('deleteSelected')} ({selectedIds.size})
+                </button>
               </div>
-            )}
+            </div>
+
+            <div className="admin__grid">
+              {visible.map((p) => {
+                const src = p.watermarkedUrl || p.url;
+                const name = p.filename || p.title || t('photo');
+                const edit = edits[p.id] || {};
+                return (
+                  <div key={p.id} className="admin__card">
+                    <div className="ratio ratio--1x1">
+                      <div className="mediaBox">
+                        <img src={src} alt={name} />
+                        <div className="mediaBox__price">
+                          {fmtEUR(edit.price ?? p.price)}
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(p.id)}
+                          onChange={() => toggleSelect(p.id)}
+                          className="mediaBox__check"
+                          title={t('selectForBulkActions')}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ padding: "var(--space-lg)" }}>
+                      <div className="row between">
+                        <h3 className="text-ellipsis" style={{ fontWeight: 600, maxWidth: "70%" }}>{name}</h3>
+                        <button onClick={() => window.open(src, "_blank")} className="linkBtn" type="button">
+                          <Eye size={16} />
+                          View
+                        </button>
+                      </div>
+
+                      <p className="muted" style={{ fontSize: "0.75rem", marginBottom: "var(--space-sm)" }}>
+                        {p.uploadedAt ? new Date(p.uploadedAt).toLocaleDateString() : ""}
+                      </p>
+
+                      <div className="row" style={{ gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          className="admin__input"
+                          value={edit.price ?? (p.price ?? "")}
+                          onChange={(e) => setEditField(p.id, "price", e.target.value)}
+                          placeholder="5.99"
+                          style={{ flex: 1 }}
+                        />
+                        <select
+                          className="admin__select"
+                          value={edit.category ?? p.category ?? ""}
+                          onChange={(e) => setEditField(p.id, "category", e.target.value)}
+                          style={{ flex: 1 }}
+                        >
+                          <option value="">(none)</option>
+                          {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
+                        </select>
+                      </div>
+
+                      <div className="admin__actions">
+                        <button
+                          className="btn btn--danger"
+                          onClick={() => deleteOne(p.id)}
+                          type="button"
+                        >
+                          <Trash2 size={16} />
+                          Delete
+                        </button>
+                        <button
+                          className="btn btn--primary"
+                          onClick={() => savePhotoEdits(p.id)}
+                          type="button"
+                        >
+                          <Save size={16} />
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {visible.length === 0 && (
+                <div className="muted" style={{ gridColumn: "1 / -1", textAlign: "center", padding: "var(--space-2xl)" }}>
+                  No photos in this category
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -393,12 +579,12 @@ const AdminPanel = () => {
       {/* CATEGORIES */}
       {activeTab === "categories" && (
         <div className="stack-6">
-          <div className="card p-4">
-            <h2 className="mb-3" style={{ fontWeight: 700, fontSize: 18 }}>Create Category</h2>
-            <div className="row" style={{ gap: 12 }}>
+          <div className="admin__section">
+            <h2>{t('addCategory')}</h2>
+            <div className="row">
               <input
-                className="input"
-                placeholder="new-category-name"
+                className="admin__input"
+                placeholder={t('categoryName')}
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
               />
@@ -410,32 +596,57 @@ const AdminPanel = () => {
                   setNewCategoryName("");
                 }}
               >
-                <Plus style={{ width: 16, height: 16, marginRight: 6, verticalAlign: -3 }} />
-                Create
+                <Plus size={16} />
+                {t('addNewCategory')}
               </button>
             </div>
           </div>
 
-          <div className="card p-4">
-            <h2 className="mb-3" style={{ fontWeight: 700, fontSize: 18 }}>Existing Categories</h2>
-            {categories.length === 0 && <p className="muted">No categories yet</p>}
+          <div className="admin__section">
+            <h2>{t('categories')}</h2>
+            {categories.length === 0 && <p className="muted">{t('noCategoriesYet')}</p>}
 
-            <div className="grid grid--3">
-              {categories.map((c) => (
-                <div key={c} className="card p-4" style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ fontWeight: 600 }}>{c}</div>
-                  <button className="btn btn--danger" onClick={() => removeCategory(c)}>
-                    <Trash2 style={{ width: 16, height: 16, marginRight: 6, verticalAlign: -3 }} />
-                    Delete
-                  </button>
-                </div>
-              ))}
+            <div className="admin__grid">
+              {categories.map((c) => {
+                const photosInCategory = photos.filter(p => (p.category || "").trim() === c.trim());
+                return (
+                  <div key={c} className="admin__card" style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontWeight: 600 }}>{c}</div>
+                      <div className="muted" style={{ fontSize: "0.875rem" }}>
+                        {photosInCategory.length} {photosInCategory.length === 1 ? t('photo') : t('photos')}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: "flex", gap: "var(--space-sm)" }}>
+                      {photosInCategory.length > 0 && (
+                        <button 
+                          className="btn btn--warning" 
+                          onClick={() => deleteAllPhotosFromCategory(c)}
+                          style={{ flex: 1 }}
+                        >
+                          <Trash2 size={16} />
+                          {t('deleteAllPhotos')}
+                        </button>
+                      )}
+                      <button 
+                        className="btn btn--danger" 
+                        onClick={() => removeCategory(c)}
+                        style={{ flex: 1 }}
+                      >
+                        <Trash2 size={16} />
+                        {t('deleteCategory')}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="row" style={{ gap: 12, marginTop: 16 }}>
+            <div className="row" style={{ marginTop: "var(--space-lg)" }}>
               <input
-                className="input"
-                placeholder="category-to-delete"
+                className="admin__input"
+                placeholder={t('categoryName')}
                 value={deleteCategoryName}
                 onChange={(e) => setDeleteCategoryName(e.target.value)}
               />
@@ -447,8 +658,8 @@ const AdminPanel = () => {
                   setDeleteCategoryName("");
                 }}
               >
-                <Trash2 style={{ width: 16, height: 16, marginRight: 6, verticalAlign: -3 }} />
-                Delete by name
+                <Trash2 size={16} />
+                {t('delete')}
               </button>
             </div>
           </div>
@@ -458,62 +669,80 @@ const AdminPanel = () => {
       {/* ORDERS */}
       {activeTab === "orders" && (
         <div className="stack-6">
-          <div className="row between">
-            <h2 className="mb-0" style={{ fontWeight: 700, fontSize: 18 }}>Order History</h2>
-            <button className="btn btn--secondary" onClick={fetchOrders}>Refresh Orders</button>
-          </div>
+          <div className="admin__section">
+            <div className="row between">
+              <h2>{t('orderHistory')}</h2>
+              <button className="btn btn--secondary" onClick={fetchOrders}>{t('refreshOrders')}</button>
+            </div>
 
-          <div className="stack-4">
-            {orders.map((o) => (
-              <div key={o.id} className="card p-4">
-                <div className="row between">
-                  <div>
-                    <h3 style={{ fontWeight: 600 }}>Order #{o.id}</h3>
-                    <p className="muted" style={{ fontSize: 12 }}>
-                      {o.customerName} ({o.customerEmail})
-                    </p>
-                    <p className="muted" style={{ fontSize: 12 }}>
-                      {new Date(o.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
+            <div className="stack-4">
+              {orders.map((o) => (
+                <div key={o.id} className="admin__card">
+                  <div className="row between">
+                    <div>
+                      <h3 style={{ fontWeight: 600 }}>Order #{o.id}</h3>
+                      <p className="muted" style={{ fontSize: "0.75rem" }}>
+                        {o.customerName} ({o.customerEmail})
+                      </p>
+                      <p className="muted" style={{ fontSize: "0.75rem" }}>
+                        {new Date(o.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
 
-                  <div style={{ textAlign: "right" }}>
-                    <p style={{ fontWeight: 700, color: "var(--primary)" }}>€{o.totalAmount}</p>
-                    <p className="muted" style={{ fontSize: 12 }}>
-                      {o.photoCount} photo{o.photoCount !== 1 ? "s" : ""}
-                    </p>
-                    <span className={`pill ${o.status === "completed" ? "pill--green" : "pill--yellow"}`} style={{ marginTop: 6, display: "inline-block" }}>
-                      {o.status}
-                    </span>
+                    <div style={{ textAlign: "right" }}>
+                      <p style={{ fontWeight: 700, color: "var(--primary)" }}>€{o.totalAmount}</p>
+                      <p className="muted" style={{ fontSize: "0.75rem" }}>
+                        {o.photoCount} photo{o.photoCount !== 1 ? "s" : ""}
+                      </p>
+                      <span className={`pill ${o.status === "completed" ? "pill--green" : "pill--yellow"}`} style={{ marginTop: "var(--space-sm)", display: "inline-block" }}>
+                        {o.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            {orders.length === 0 && <div className="muted" style={{ textAlign: "center", padding: 24 }}>No orders yet</div>}
+              ))}
+              {orders.length === 0 && <div className="muted" style={{ textAlign: "center", padding: "var(--space-2xl)" }}>No orders yet</div>}
+            </div>
           </div>
         </div>
       )}
 
       {/* ANALYTICS */}
       {activeTab === "analytics" && (
-        <div className="grid grid--3">
-          <StatCard icon={Users} color="var(--primary)" label="Total Photos" value={photos.length} />
-          <StatCard icon={Package} color="var(--green)" label="Total Orders" value={orders.length} />
+        <div className="admin__grid">
+          <StatCard icon={Users} color="var(--primary)" label={t('totalPhotos')} value={photos.length} />
+          <StatCard icon={Package} color="var(--success)" label={t('totalOrders')} value={orders.length} />
           <StatCard
             icon={DollarSign}
-            color="#ca8a04"
-            label="Total Revenue"
+            color="var(--warning)"
+            label={t('totalRevenue')}
             value={"€" + orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toFixed(2)}
           />
         </div>
       )}
     </div>
   );
+  
+  } catch (error) {
+    console.error("❌ AdminPanel error:", error);
+    return (
+      <div className="admin">
+        <div className="adminHeader">
+          <h1 className="adminTitle">Admin Panel Error</h1>
+        </div>
+        <div style={{ padding: "20px", color: "red" }}>
+          <h2>Error loading Admin Panel</h2>
+          <p>Error: {error.message}</p>
+          <button onClick={() => window.location.reload()}>Reload Page</button>
+        </div>
+      </div>
+    );
+  }
 };
 
 const StatCard = ({ icon: Icon, color, label, value }) => (
-  <div className="card p-4 centerText">
-    <Icon style={{ width: 32, height: 32, margin: "0 auto 8px", color }} />
+  <div className="admin__card centerText">
+    <Icon size={32} style={{ margin: "0 auto var(--space-sm)", color }} />
     <h3 className="stat">{value}</h3>
     <p className="muted">{label}</p>
   </div>
@@ -537,7 +766,7 @@ function endProgress(setProgress, setSuccess, msg) {
 }
 function failProgress(setBusy, setError, err) {
   setBusy(false);
-  setError(err?.response?.data?.error || err?.message || "Upload failed");
+  setError(err?.response?.data?.error || err?.message || t('uploadFailed'));
   setTimeout(() => setError(""), 3000);
 }
 

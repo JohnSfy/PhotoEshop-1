@@ -43,25 +43,48 @@ export const PhotoProvider = ({ children }) => {
   };
 
   const fetchPhotos = async () => {
-    const { data } = await api.get("/photos");
-    const list = Array.isArray(data) ? data : [];
-    const normalized = list.map((p) => {
-      const url = toWatermarkedUrl(p.path_to_watermark || p.watermarkedPath || p.path);
-      return {
-        ...p,
-        id: p.id || p._id || p.filename || url,
-        url,
-        watermarkedUrl: url,
-        watermarkedPath: url,
-        uploadedAt: p.updated ? new Date(p.updated) : new Date(),
-        category: (p.category || "").trim(),
-        price: typeof p.price === "number" ? p.price : (p.price ?? 0),
-        filename: p.filename || p.title || "Photo",
-      };
-    });
-    setPhotos(normalized);
-    setWmPhotos(normalized);
-    return normalized;
+    try {
+      console.log("🔄 Fetching photos from API...");
+      const response = await api.get("/photos");
+      console.log("📡 Fetch response status:", response.status);
+      console.log("📥 Raw API response:", response.data);
+      
+      const list = Array.isArray(response.data) ? response.data : [];
+      console.log("📋 Photos list length:", list.length);
+      console.log("📋 Photos list:", list);
+      
+      if (list.length === 0) {
+        console.warn("⚠️ No photos returned from API!");
+      }
+      
+      const normalized = list.map((p) => {
+        const url = toWatermarkedUrl(p.path_to_watermark || p.watermarkedPath || p.path);
+        const normalizedPhoto = {
+          ...p,
+          id: p.id || p._id || p.filename || url,
+          url,
+          watermarkedUrl: url,
+          watermarkedPath: url,
+          uploadedAt: p.updated ? new Date(p.updated) : new Date(),
+          category: (p.category || "").trim(),
+          price: typeof p.price === "number" ? p.price : (p.price ?? 0),
+          filename: p.filename || p.title || "Photo",
+        };
+        console.log("🖼️ Normalized photo:", normalizedPhoto);
+        return normalizedPhoto;
+      });
+      
+      console.log("✨ Total normalized photos:", normalized.length);
+      console.log("✨ Normalized photos:", normalized);
+      
+      setPhotos(normalized);
+      setWmPhotos(normalized);
+      return normalized;
+    } catch (error) {
+      console.error("❌ Error fetching photos:", error);
+      console.error("❌ Error response:", error.response?.data);
+      throw error;
+    }
   };
 
   const uploadPhotos = async ({ files, categories = [], prices = [] }) => {
@@ -70,17 +93,62 @@ export const PhotoProvider = ({ children }) => {
 
     list.forEach((file) => fd.append("photos", file));
 
-    // 🔁 ΣΗΜΑΝΤΙΚΟ: χρησιμοποίησε [] για arrays
-    list.forEach((_, i) => fd.append("prices[]", String(prices[i] ?? "")));
-    list.forEach((_, i) => fd.append("categories[]", categories[i] ?? ""));
+    // Backend expects single values: req.body.price and req.body.category
+    // Since all photos get the same category and price, use the first values
+    if (categories.length > 0 && categories[0]) {
+      fd.append("category", categories[0]);
+    }
+    if (prices.length > 0 && prices[0]) {
+      fd.append("price", String(prices[0]));
+    }
+
+    // Debug logging
+    console.log("🚀 PhotoContext Upload Debug:");
+    console.log("Categories received:", categories);
+    console.log("Prices received:", prices);
+    console.log("Sending to backend:");
+    console.log("  category:", categories[0] || "undefined");
+    console.log("  price:", prices[0] || "undefined");
+    console.log("FormData entries:");
+    for (let [key, value] of fd.entries()) {
+      console.log(`  ${key}:`, value);
+    }
 
     const res = await fetch(`${API_BASE}/api/photos/upload-multiple`, {
       method: "POST",
       body: fd,
     });
-    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+    
+    console.log("📡 Upload response status:", res.status);
+    console.log("📡 Upload response headers:", Object.fromEntries(res.headers.entries()));
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("❌ Upload failed:", res.status, errorText);
+      throw new Error(`Upload failed: ${res.status} - ${errorText}`);
+    }
+    
     const data = await res.json();
+    console.log("📥 Server response:", data);
+    console.log("📥 Upload results:", data.results);
+    console.log("📥 Summary:", data.summary);
+    
+    // Check if upload was actually successful
+    if (data.summary && data.summary.successful === 0) {
+      console.error("❌ No photos were successfully uploaded!");
+      throw new Error("No photos were successfully uploaded");
+    }
+    
+    // Force refresh photos multiple times to ensure we get the latest data
+    console.log("🔄 Refreshing photos after upload...");
     await fetchPhotos();
+    
+    // Wait a bit and refresh again (in case of server processing delay)
+    setTimeout(async () => {
+      console.log("🔄 Second refresh after upload...");
+      await fetchPhotos();
+    }, 2000);
+    
     return data;
   };
 
@@ -96,14 +164,53 @@ export const PhotoProvider = ({ children }) => {
 
   // Delete one or many
   const deletePhotos = async (ids) => {
+    console.log("🗑️ PhotoContext deletePhotos called with:", ids);
     const arr = Array.isArray(ids) ? ids : [ids];
-    if (arr.length === 1) {
-      await api.delete(`/photos/${arr[0]}`);
-    } else if (arr.length > 1) {
-      // Preferred bulk form (matches your HTML tester)
-      await api.delete(`/photos/bulk`, { data: { photo_ids: arr } });
+    console.log("📋 Processing array:", arr);
+    
+    try {
+      if (arr.length === 1) {
+        console.log("🔸 Single delete - calling:", `/photos/${arr[0]}`);
+        await api.delete(`/photos/${arr[0]}`);
+        console.log("✅ Single delete successful");
+      } else if (arr.length > 1) {
+        console.log("🔸 Bulk delete - deleting photos one by one (bulk endpoint not available)");
+        console.log("📋 Photos to delete:", arr);
+        
+        // Delete photos one by one since bulk endpoint doesn't exist
+        const deletePromises = arr.map(async (id, index) => {
+          console.log(`🔸 Deleting photo ${index + 1}/${arr.length}:`, id);
+          try {
+            await api.delete(`/photos/${id}`);
+            console.log(`✅ Photo ${id} deleted successfully`);
+            return { id, success: true };
+          } catch (error) {
+            console.error(`❌ Failed to delete photo ${id}:`, error);
+            return { id, success: false, error };
+          }
+        });
+        
+        const results = await Promise.all(deletePromises);
+        const successful = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        
+        console.log(`📊 Delete results: ${successful} successful, ${failed} failed`);
+        
+        if (failed > 0) {
+          const failedIds = results.filter(r => !r.success).map(r => r.id);
+          console.warn("⚠️ Some photos failed to delete:", failedIds);
+          // Don't throw error, just log it - some photos might have been deleted
+        }
+      }
+      
+      console.log("🔄 Refreshing photos after delete...");
+      await fetchPhotos();
+      console.log("✅ Photos refreshed after delete");
+    } catch (error) {
+      console.error("❌ Delete operation failed:", error);
+      console.error("❌ Error response:", error.response?.data);
+      throw error;
     }
-    await fetchPhotos();
   };
 
   // Categories CRUD
